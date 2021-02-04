@@ -31,7 +31,7 @@ int decrypt_packet(char *plain, char *encrypted, size_t len)
 
     // decrypt payload with decrypted IV
     size_t msg_len = len - sizeof(iv_recv);
-    memcpy(msg_crypted, &msg_crypted[sizeof(iv_recv)], msg_len);
+    memcpy(msg_crypted, &encrypted[sizeof(iv_recv)], msg_len);
     mbedtls_aes_init(&aes);
     if (mbedtls_aes_setkey_dec(&aes, key, BLOCK_SIZE*8) != 0) {
         return SETKEY_ERROR;
@@ -46,7 +46,7 @@ int decrypt_packet(char *plain, char *encrypted, size_t len)
         return PADDING_ERROR;
     }
 
-    strncpy(plain, (char*)msg_padded, msg_unpadded_len);
+    strncpy(plain, (char*)msg_padded, msg_unpadded_len); //todo add check or strlcpy?
 
     return 0;
 }
