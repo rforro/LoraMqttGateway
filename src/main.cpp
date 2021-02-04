@@ -4,7 +4,6 @@
 #include "gateway.h"
 #include "loracomm.h"
 #include "mqtt.h"
-#include "crypto.h"
 
 EspNtpTime NtpTime;
 StringRingBuffer Strring(1000);
@@ -48,6 +47,7 @@ void setup()
   NtpTime.init();
   Sprintln("Waiting for NTP time");
   if (NtpTime.waitForTime() == false) {
+    Sprintln("Cannot obtain NTP time, rebooting...");
     ESP.restart();
   }
 
@@ -81,12 +81,10 @@ void loop()
   }
 
   if (!Strring.is_empty()) {
-    char text[100];
-    Strring.popstr(text);
-
-    // decrypt_packet(msg, &buffer[strlen(MAGIC_WORD)], packetSize-strlen(MAGIC_WORD));
-
-    publishMqtt("/topic", text);
+    char encr[300];
+    Strring.popstr(encr);
+    Sprintln(encr);
+    publishMqtt("/topic", (const char*)encr);   
   }
 }
 

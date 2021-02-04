@@ -2,6 +2,7 @@
 #include <LoRa.h>
 #include "gateway.h"
 #include "loracomm.h"
+#include "crypto.h"
 
 #define SCK 5
 #define MISO 19
@@ -18,6 +19,7 @@
 IRAM_ATTR void callbackRecv(int packetSize)
 {
     char buffer[packetSize];
+    char plain[packetSize];
 
     for (int i = 0; i < packetSize; i++)
     {
@@ -29,7 +31,12 @@ IRAM_ATTR void callbackRecv(int packetSize)
         Sprint("Received valid msg with rssi: ");
         Sprintln(LoRa.packetRssi());
 
-        Strring.pushnstr(&buffer[strlen(MAGIC_WORD)], packetSize - strlen(MAGIC_WORD));
+        int ret = decrypt_packet(plain, &buffer[strlen(MAGIC_WORD)], packetSize-strlen(MAGIC_WORD));
+        Sprint("Decryption returned: ");
+        Sprintln(ret);
+        if (ret == 0) {
+            Strring.pushstr(plain);
+        }        
     }
     else
     {
