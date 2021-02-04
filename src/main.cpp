@@ -46,11 +46,12 @@ void setup()
   Sprintln(WiFi.RSSI());
 
   NtpTime.init();
-  Sprintln("Waiting for NTP time");
+  Sprint("Waiting for NTP time: ");
   if (NtpTime.waitForTime() == false) {
-    Sprintln("Cannot obtain NTP time, rebooting...");
+    Sprintln("ERROR, cannot obtain NTP time, rebooting...");
     ESP.restart();
   }
+  Sprintln("success");
 
   if (snprintf(client_id, sizeof(client_id), "ESP-%08X", espGetChipId()) >= (int) sizeof(client_id)) {
         Sprintln("Client id cannot be constructed");

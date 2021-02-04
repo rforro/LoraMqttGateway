@@ -1,9 +1,14 @@
 #include "EspNtpTime.h"
 
-EspNtpTime::EspNtpTime(){}
-
+/**
+ * Requests time from NTP server and set timer to auto renew
+ */
 void EspNtpTime::init(const char *server1, const char *server2, const char *server3) {
     configTime(0, 0, server1, server2, server3);
+}
+
+void EspNtpTime::init() {
+    configTime(0, 0, DEFAULT_NTP_SERVERS);
 }
 
 /**
