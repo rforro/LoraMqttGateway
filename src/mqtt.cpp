@@ -58,6 +58,6 @@ void runMqtt() {
     mqtt.loop();
 }
 
-void publishMqtt(char *topic, char *payload) {
+void publishMqtt(const char *topic, const char *payload) {
     mqtt.publish(topic, payload, false);
 }
