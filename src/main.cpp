@@ -1,6 +1,7 @@
 #include <Arduino.h>
-#include <WiFi.h>
+#include <ArduinoJson.h>
 #include <EspNtpTime.h>
+#include <WiFi.h>
 #include "gateway.h"
 #include "loracomm.h"
 #include "mqtt.h"
@@ -82,9 +83,30 @@ void loop()
 
   if (!Strring.is_empty()) {
     char encr[300];
+    StaticJsonDocument<128> doc;
+
     Strring.popstr(encr);
+    Sprint("Read from strring buffer: ");
     Sprintln(encr);
-    publishMqtt("/topic", (const char*)encr);   
+
+    DeserializationError error = deserializeJson(doc, encr, sizeof(encr));
+    if (error) {
+      Sprint("ERROR, deserializeJson() failed: ");
+      Sprintln(error.f_str());
+      return;
+    } else {
+      char payload[100];
+      const char* topic = doc["t"];
+
+      if (doc["p"].is<JsonObject>()) {
+        JsonObject payloadJson = doc["p"].as<JsonObject>();
+        serializeJson(payloadJson, payload);
+      } else if(doc["p"].is<char*>()) {
+        strlcpy(payload, doc["p"], sizeof(payload));      
+      }
+
+      publishMqtt(topic, payload);
+    }
   }
 }
 
