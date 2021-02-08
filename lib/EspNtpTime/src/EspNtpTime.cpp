@@ -64,7 +64,7 @@ boolean EspNtpTime::getUtcIsoString(char *t)
  */
 boolean EspNtpTime::getUtcIsoString(char *t, size_t l)
 {
-    if (l < 20)
+    if (l < 21)
         return false;
 
     return getUtcIsoString(t);
