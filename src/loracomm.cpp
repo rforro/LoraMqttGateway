@@ -36,7 +36,7 @@ IRAM_ATTR void callbackRecv(int packetSize)
         Sprintln(ret);
         if (ret == 0) {
             Strring.pushstr(plain);
-        }        
+        }
     }
     else
     {
