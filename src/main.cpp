@@ -101,9 +101,15 @@ void loop()
 
       if (doc["p"].is<JsonObject>()) {
         JsonObject payloadJson = doc["p"].as<JsonObject>();
-        serializeJson(payloadJson, payload);
+        if (serializeJson(payloadJson, payload) >= sizeof(payload)) {
+          Sprintln("ERROR, payload array too short");
+          return;
+        }
       } else if(doc["p"].is<char*>()) {
-        strlcpy(payload, doc["p"], sizeof(payload));      
+        if (strlcpy(payload, doc["p"], sizeof(payload)) >= sizeof(payload)) {
+          Sprintln("ERROR, payload array too short");
+          return;
+        }
       }
 
       publishMqtt(topic, payload);

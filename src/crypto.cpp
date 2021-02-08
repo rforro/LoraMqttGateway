@@ -10,13 +10,13 @@ const unsigned char iv_key[BLOCK_SIZE] = IV_KEY;
 
 mbedtls_aes_context aes;
 
-int decrypt_packet(char *plain, char *encrypted, size_t len)
+int decrypt_packet(char *plain, size_t plain_len, char *encrypted, size_t encrypted_len)
 {
     unsigned char iv_recv[BLOCK_SIZE] = {0};
     unsigned char iv_static[BLOCK_SIZE] = IV_STATIC;
     unsigned char iv[BLOCK_SIZE] = {0};
-    unsigned char msg_crypted[len];
-    unsigned char msg_padded[len];
+    unsigned char msg_crypted[encrypted_len];
+    unsigned char msg_padded[encrypted_len];
 
     // decrypt IV for payload
     memcpy(iv_recv, encrypted, BLOCK_SIZE);
@@ -30,7 +30,7 @@ int decrypt_packet(char *plain, char *encrypted, size_t len)
     mbedtls_aes_free(&aes);
 
     // decrypt payload with decrypted IV
-    size_t msg_len = len - sizeof(iv_recv);
+    size_t msg_len = encrypted_len - sizeof(iv_recv);
     memcpy(msg_crypted, &encrypted[sizeof(iv_recv)], msg_len);
     mbedtls_aes_init(&aes);
     if (mbedtls_aes_setkey_dec(&aes, key, BLOCK_SIZE*8) != 0) {
@@ -46,7 +46,9 @@ int decrypt_packet(char *plain, char *encrypted, size_t len)
         return PADDING_ERROR;
     }
 
-    strncpy(plain, (char*)msg_padded, msg_unpadded_len); //todo add check or strlcpy?
+    if (strlcpy(plain, (char*)msg_padded, msg_unpadded_len) >= plain_len) {
+        return PLAIN_LENGTH_ERROR;
+    }
 
     return 0;
 }
