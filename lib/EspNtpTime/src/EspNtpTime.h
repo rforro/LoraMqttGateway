@@ -13,7 +13,8 @@ public:
     void init();
     boolean isSet();
     boolean waitForTime(unsigned long timeoutMs = 60000);
-    int getUtcIsoString(char *t);
+    boolean getUtcIsoString(char *t);
+    boolean getUtcIsoString(char *t, size_t l);
 };
 
 #endif //ESPNTPTIME_H

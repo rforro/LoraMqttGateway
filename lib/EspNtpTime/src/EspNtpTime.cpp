@@ -3,11 +3,13 @@
 /**
  * Requests time from NTP server and set timer to auto renew
  */
-void EspNtpTime::init(const char *server1, const char *server2, const char *server3) {
+void EspNtpTime::init(const char *server1, const char *server2, const char *server3)
+{
     configTime(0, 0, server1, server2, server3);
 }
 
-void EspNtpTime::init() {
+void EspNtpTime::init()
+{
     configTime(0, 0, DEFAULT_NTP_SERVERS);
 }
 
@@ -17,7 +19,9 @@ void EspNtpTime::init() {
  */
 boolean EspNtpTime::isSet()
 {
-    struct tm t{};
+    struct tm t
+    {
+    };
     return getLocalTime(&t);
 }
 
@@ -27,23 +31,41 @@ boolean EspNtpTime::isSet()
  */
 boolean EspNtpTime::waitForTime(unsigned long timeoutMs)
 {
-    struct tm t{};
+    struct tm t
+    {
+    };
     return getLocalTime(&t, timeoutMs);
 }
 
 /**
  * Writes current time in UTC ISO 8601 format (21 chars)
- * @returns 0 if success, otherwise -1
+ * @returns true if success, otherwise false
  */
-int EspNtpTime::getUtcIsoString(char *t) {
+boolean EspNtpTime::getUtcIsoString(char *t)
+{
     struct tm timeinfo{};
 
-    if (!getLocalTime(&timeinfo)) {
-        return -1;
+    if (!getLocalTime(&timeinfo))
+    {
+        return false;
     }
 
     sprintf(t, "%04d-%02d-%02dT%02d:%02d:%02dZ", 1900 + timeinfo.tm_year, 1 + timeinfo.tm_mon,
             timeinfo.tm_mday, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
 
-    return 0;
+    return true;
+}
+
+/**
+ * Writes current time in UTC ISO 8601 format
+ * and checks if target is sufficent long
+ * which is 20 chars plus NULL terminator.
+ * @returns true if success, otherwise false
+ */
+boolean EspNtpTime::getUtcIsoString(char *t, size_t l)
+{
+    if (l < 20)
+        return false;
+
+    return getUtcIsoString(t);
 }
