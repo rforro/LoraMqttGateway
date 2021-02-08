@@ -6,6 +6,7 @@
 #include <PubSubClient.h>
 #include "gateway.h"
 #include "loracomm.h"
+#include "oled.h"
 
 EspNtpTime NtpTime;
 StringRingBuffer Strring(1000);
@@ -25,6 +26,8 @@ void setup()
   SprintBegin(115200);
   Sprintln("Homeassistant Lora Gateway");
 
+  initScreen();
+
   if (loraInit() != 0)
   {
     Sprintln("Lora cannot be started, rebooting...");
@@ -39,6 +42,7 @@ void setup()
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
+  WiFi.setHostname(WIFI_HOSTNAME);
 
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   if (WiFi.waitForConnectResult() != WL_CONNECTED)
@@ -100,7 +104,17 @@ void setup()
 
 void loop()
 {
+  unsigned long currMs = millis();
+  static unsigned long prevMs = -1;
+  static unsigned int msg_counter = 0;
+
   mqtt.loop();
+  
+  if (currMs - prevMs >= OLED_REFRESH_INTERVAL_MS) {
+    prevMs = currMs;
+    bool mqtt_state = mqtt.state() == 0 ? true : false;
+    refreshInfoScreen(mqtt_state, WiFi.localIP(), ESP.getFreeHeap(), msg_counter);
+  }
 
   if (WiFi.status() != WL_CONNECTED)
   {
@@ -144,6 +158,7 @@ void loop()
       }
 
       mqtt.publish(topic, payload, false);
+      msg_counter++;
     }
   }
 }
