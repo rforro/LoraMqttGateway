@@ -2,18 +2,26 @@
 #include <ArduinoJson.h>
 #include <EspNtpTime.h>
 #include <WiFi.h>
+#include <WiFiClient.h>
+#include <PubSubClient.h>
 #include "gateway.h"
 #include "loracomm.h"
-#include "mqtt.h"
 
 EspNtpTime NtpTime;
 StringRingBuffer Strring(1000);
-char client_id[15];
+WiFiClient espClient;
+PubSubClient mqtt(espClient);
 
 uint32_t espGetChipId();
+int connectMqtt();
+
+char client_id[15];
+char topic_on_off_line[50];
 
 void setup()
 {
+  int len_sn;
+
   SprintBegin(115200);
   Sprintln("Homeassistant Lora Gateway");
 
@@ -53,23 +61,46 @@ void setup()
   }
   Sprintln("success");
 
-  if (snprintf(client_id, sizeof(client_id), "ESP-%08X", espGetChipId()) >= (int) sizeof(client_id)) {
+  len_sn = snprintf(client_id, sizeof(client_id), "ESP-%08X", espGetChipId());
+  if (len_sn < 0 || (unsigned) len_sn >= (int) sizeof(client_id)) {
         Sprintln("Client id cannot be constructed");
         ESP.restart();
   };
 
+  len_sn = snprintf(topic_on_off_line, sizeof(topic_on_off_line), MQTT_TOPIC_ONOFFLINE, client_id);
+  if (len_sn < 0 || (unsigned) len_sn >= sizeof(topic_on_off_line)) {
+    Sprintln("ERROR, online n offline topic truncated");
+    return;
+  }
+
   Sprint("Starting MQTT connection: ");
-  initMqtt();
-  if(connectMqtt(client_id) != 0) {
+  mqtt.setServer(MQTT_BROKER_IP, 1883);
+  if (connectMqtt() != 0) {
+    Sprint("ERROR, MQTT failed, rc=");
+    Sprintln(mqtt.state());
     delay(DELAYED_RESTART);
     ESP.restart();
   }
   Sprintln("success");
+
+  char payload[50];
+  char utc[21];
+  if (!NtpTime.getUtcIsoString(utc, sizeof(utc))) {
+    Sprintln("ERROR, cannot obtain UTC time");
+    delay(DELAYED_RESTART);
+    ESP.restart();
+  }
+  len_sn = snprintf(payload, sizeof(payload), MQTT_PAYLOAD_ONLINE, utc);
+  if (len_sn < 0 || (unsigned) len_sn >= sizeof(payload)) {
+    Sprintln("ERROR, online payload truncated");
+    return;
+  }
+  mqtt.publish(topic_on_off_line, payload, true);
 }
 
 void loop()
 {
-  runMqtt();
+  mqtt.loop();
 
   if (WiFi.status() != WL_CONNECTED)
   {
@@ -77,9 +108,9 @@ void loop()
     WiFi.reconnect();
   }
 
-  if(!isMqttConnected()) {
+  if(!mqtt.connected()) {
     Sprintln("Mqtt connection is down, reconnecting...");
-    connectMqtt(client_id);
+    connectMqtt();
   }
 
   if (!Strring.is_empty()) {
@@ -112,7 +143,7 @@ void loop()
         }
       }
 
-      publishMqtt(topic, payload);
+      mqtt.publish(topic, payload, false);
     }
   }
 }
@@ -127,4 +158,14 @@ uint32_t espGetChipId() {
         chip_id |= ((ESP.getEfuseMac() >> (40u - i)) & 0xffu) << i;
     }
     return chip_id;
+}
+
+/**
+ * Connects to MQTT server and sets LWT
+ * @returns value from PubSubClient.state()
+ */
+int connectMqtt()
+{
+    mqtt.connect(client_id, MQTT_USER, MQTT_PASS, topic_on_off_line, 1, true, MQTT_PAYLOAD_OFFLINE);
+    return mqtt.state();
 }
