@@ -1,6 +1,6 @@
-#include <SPI.h>
 #include <LoRa.h>
 #include <SerPrint.h>
+#include <SPI.h>
 #include "gateway.h"
 #include "loracomm.h"
 #include "crypto.h"

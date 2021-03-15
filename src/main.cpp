@@ -2,10 +2,10 @@
 #include <ArduinoJson.h>
 #include <EspNtpTime.h>
 #include <EspChipId.h>
-#include <WiFi.h>
-#include <WiFiClient.h>
 #include <PubSubClient.h>
 #include <SerPrint.h>
+#include <WiFi.h>
+#include <WiFiClient.h>
 #include "gateway.h"
 #include "loracomm.h"
 #include "oled.h"
@@ -15,7 +15,6 @@ StringRingBuffer Strring(1000);
 WiFiClient espClient;
 PubSubClient mqtt(espClient);
 
-uint32_t espGetChipId();
 int connectMqtt();
 
 char client_id[17];
@@ -43,7 +42,7 @@ void setup()
   SerPrint("Starting wifi connection: ");
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
-  WiFi.persistent(true);
+  WiFi.persistent(false);
   WiFi.setHostname(WIFI_HOSTNAME);
 
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -53,7 +52,6 @@ void setup()
     delay(DELAYED_RESTART);
     ESP.restart();
   };
-
   SerPrint("success, IP: ");
   SerPrint(WiFi.localIP());
   SerPrint(" and rssi: ");
@@ -87,44 +85,32 @@ void setup()
     delay(DELAYED_RESTART);
     ESP.restart();
   }
-  SerPrintln("success");
 
-  char payload[50];
-  char utc[21];
-  if (!NtpTime.getUtcIsoString(utc, sizeof(utc))) {
-    SerPrintln("ERROR, cannot obtain UTC time");
-    delay(DELAYED_RESTART);
-    ESP.restart();
-  }
-  len_sn = snprintf(payload, sizeof(payload), MQTT_PAYLOAD_ONLINE, utc);
-  if (len_sn < 0 || (unsigned) len_sn >= sizeof(payload)) {
-    SerPrintln("ERROR, online payload truncated");
-    return;
-  }
-  mqtt.publish(topic_on_off_line, payload, true);
+  SerPrintln("initialization done");  
 }
 
-void loop()
-{
-  unsigned long currMs = millis();
-  static unsigned long prevMs = -1;
+void loop() {
+  unsigned long curr_ms = millis();
+  static unsigned long prev_ms = -1, mqtt_connect_ms;
   static unsigned int msg_counter = 0;
   
-  if (currMs - prevMs >= OLED_REFRESH_INTERVAL_MS) {
-    prevMs = currMs;
+  if (curr_ms - prev_ms >= OLED_REFRESH_INTERVAL_MS) {
+    prev_ms = curr_ms;
     bool mqtt_state = mqtt.state() == 0 ? true : false;
     refreshInfoScreen(mqtt_state, WiFi.localIP(), ESP.getFreeHeap(), msg_counter);
   }
 
-  if (WiFi.status() != WL_CONNECTED)
-  {
-    SerPrintln("Wifi connection is down, reconnecting...");
-    WiFi.reconnect();
-  }
-
-  if(!mqtt.loop()) {
+  if (!mqtt.loop() && (WiFi.status() == WL_CONNECTED)) {
     SerPrintln("Mqtt connection is down, reconnecting...");
-    connectMqtt();
+    static uint8_t retry_nr = 0;
+    if (curr_ms - mqtt_connect_ms >= pow(2, retry_nr) * 1000) {
+      mqtt_connect_ms = curr_ms;
+      if (connectMqtt() == 0) {
+          retry_nr = 0;
+      } else {
+          retry_nr = (retry_nr + 1) % 17;
+      }
+    }
   }
 
   if (!Strring.is_empty()) {
@@ -167,8 +153,22 @@ void loop()
  * Connects to MQTT server and sets LWT
  * @returns value from PubSubClient.state()
  */
-int connectMqtt()
-{
-    mqtt.connect(client_id, MQTT_USER, MQTT_PASS, topic_on_off_line, 1, true, MQTT_PAYLOAD_OFFLINE);
-    return mqtt.state();
+int connectMqtt() {
+  char payload[50];
+  char utc[21];
+
+  if (mqtt.connect(client_id, MQTT_USER, MQTT_PASS, topic_on_off_line, 1, true, MQTT_PAYLOAD_OFFLINE)) {
+    if (!NtpTime.getUtcIsoString(utc, sizeof(utc))) {
+      SerPrintln("ERROR, cannot obtain UTC time");
+      return -6;
+    }
+    int len_sn = snprintf(payload, sizeof(payload), MQTT_PAYLOAD_ONLINE, utc);
+    if (len_sn < 0 || (unsigned)len_sn >= sizeof(payload)) {
+      SerPrintln("ERROR, online payload truncated");
+      return -5;
+    }
+    mqtt.publish(topic_on_off_line, payload, true);
+  }
+
+  return mqtt.state();
 }
