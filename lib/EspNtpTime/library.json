@@ -1,9 +1,0 @@
-{
-    "name": "EspNtpTime",
-    "version": "0.0.1",
-    "frameworks": "arduino",
-    "platforms": [
-        "espressif8266",
-        "espressif32"
-    ]
-}
