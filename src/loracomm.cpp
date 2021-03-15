@@ -1,5 +1,6 @@
 #include <SPI.h>
 #include <LoRa.h>
+#include <SerPrint.h>
 #include "gateway.h"
 #include "loracomm.h"
 #include "crypto.h"
@@ -28,19 +29,19 @@ IRAM_ATTR void callbackRecv(int packetSize)
 
     if (strncmp(buffer, MAGIC_WORD, strlen(MAGIC_WORD)) == 0)
     {
-        Sprint("Received valid msg with rssi: ");
-        Sprintln(LoRa.packetRssi());
+        SerPrint("Received valid msg with rssi: ");
+        SerPrintln(LoRa.packetRssi());
 
         int ret = decrypt_packet(plain, sizeof(buffer), &buffer[strlen(MAGIC_WORD)], packetSize-strlen(MAGIC_WORD));
-        Sprint("Decryption returned: ");
-        Sprintln(ret);
+        SerPrint("Decryption returned: ");
+        SerPrintln(ret);
         if (ret == 0) {
             Strring.pushstr(plain);
         }
     }
     else
     {
-        Sprintln("Wrong sync word, ignore msg");
+        SerPrintln("Wrong sync word, ignore msg");
     }
 }
 
