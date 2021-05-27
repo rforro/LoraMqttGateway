@@ -1,9 +1,10 @@
 #include <LoRa.h>
 #include <SerPrint.h>
 #include <SPI.h>
+#include "config.h"
+#include "crypto.h"
 #include "gateway.h"
 #include "loracomm.h"
-#include "crypto.h"
 
 #define SCK 5
 #define MISO 19

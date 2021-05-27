@@ -6,6 +6,7 @@
 #include <SerPrint.h>
 #include <WiFi.h>
 #include <WiFiClient.h>
+#include "config.h"
 #include "gateway.h"
 #include "loracomm.h"
 #include "oled.h"

@@ -1,7 +1,7 @@
 #include "crypto.h"
 #include "mbedtls/aes.h"
 #include "pkcs7_padding.h"
-#include "gateway.h"
+#include "config.h"
 
 #define BLOCK_SIZE 16
 
