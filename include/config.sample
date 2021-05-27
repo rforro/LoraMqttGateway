@@ -3,7 +3,6 @@
 
 #define WIFI_SSID "ssid"
 #define WIFI_PASSWORD "pass"
-#define WIFI_HOSTNAME "hostname"
 
 #define MQTT_BROKER_IP "broker"
 #define MQTT_USER "user"

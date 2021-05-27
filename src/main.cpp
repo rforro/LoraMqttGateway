@@ -4,6 +4,7 @@
 #include <EspChipId.h>
 #include <PubSubClient.h>
 #include <SerPrint.h>
+#include <Uptimer.h>
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include "config.h"
@@ -15,11 +16,11 @@ EspNtpTime NtpTime;
 StringRingBuffer Strring(1000);
 WiFiClient espClient;
 PubSubClient mqtt(espClient);
+Uptimer uptimer;
 
 int connectMqtt();
 
-char client_id[17];
-char topic_on_off_line[50];
+char client_id[20];
 
 void setup()
 {
@@ -44,7 +45,7 @@ void setup()
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
   WiFi.persistent(false);
-  WiFi.setHostname(WIFI_HOSTNAME);
+  WiFi.setHostname(DEVICE_NAME);
 
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   if (WiFi.waitForConnectResult() != WL_CONNECTED)
@@ -66,17 +67,11 @@ void setup()
   }
   SerPrintln("success");
 
-  len_sn = snprintf(client_id, sizeof(client_id), "ESP32-%08X", EspChipId.get());
+  len_sn = snprintf(client_id, sizeof(client_id), DEVICE_ID, EspChipId.get());
   if (len_sn < 0 || (unsigned) len_sn >= (int) sizeof(client_id)) {
         SerPrintln("Client id cannot be constructed");
         ESP.restart();
   };
-
-  len_sn = snprintf(topic_on_off_line, sizeof(topic_on_off_line), MQTT_TOPIC_ONOFFLINE, client_id);
-  if (len_sn < 0 || (unsigned) len_sn >= sizeof(topic_on_off_line)) {
-    SerPrintln("ERROR, online n offline topic truncated");
-    return;
-  }
 
   SerPrint("Starting MQTT connection: ");
   mqtt.setServer(MQTT_BROKER_IP, 1883);
@@ -86,14 +81,73 @@ void setup()
     delay(DELAYED_RESTART);
     ESP.restart();
   }
+  SerPrintln("success");
+
+  //publish HASS mqtt autodiscovery config
+  {
+    char dev_conf[150], mac_addr[18];
+    uint8_t mac[6];
+    const char *configs[] = {HASS_PAYLOAD_CONF_CNTR, HASS_PAYLOAD_CONF_UPTM};
+    const char *suffixes[] = {UID_SUFFIX_CNTR, UID_SUFFIX_UPTM};
+    const char *components[] = {"sensor", "sensor"};
+
+    mqtt.setBufferSize(512);
+
+    WiFi.macAddress(mac);
+    sprintf(mac_addr, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    if (snprintf(dev_conf, sizeof(dev_conf), HASS_PAYLOAD_CONF_DEVICE, mac_addr, EspChipId.get()) >= (int) sizeof(dev_conf)) {
+      SerPrintln("ERROR, device config cannot be constructed");
+    }
+
+    for (int i=0; i<(sizeof(configs) / sizeof(*configs)); i++) {
+      char config_doc[400], topic_config[75], uid[20], topic_base[75];
+      int len_tc;
+
+      len_tc = snprintf(topic_config, sizeof(topic_config), HASS_TOPIC_BASE, components[i], client_id);
+      if (len_tc < 0 || (unsigned) len_tc >= sizeof(topic_config)) {
+        SerPrintln("ERROR, config topic cannot be constructed");
+        return;
+      }
+      if (strlcat(topic_config, suffixes[i], sizeof(topic_config)) >= sizeof(topic_config)) {
+        SerPrintln("ERROR, config topic suffix cannot be constructed");
+      }
+      if (strlcat(topic_config, "/config", sizeof(topic_config)) >= sizeof(topic_config)) {
+        SerPrintln("ERROR, config topic cannot be constructed");
+      }
+      len_sn = snprintf(uid, sizeof(uid), "%08X", EspChipId.get());
+      if (len_sn < 0 || (unsigned) len_sn >= (int) sizeof(uid)) {
+        SerPrintln("Client id cannot be constructed");
+      };
+      if (strlcat(uid, suffixes[i], sizeof(uid)) >= sizeof(uid)) {
+        SerPrintln("ERROR, uid cannot be constructed");
+      }
+
+      len_tc = snprintf(topic_base, sizeof(topic_base), HASS_TOPIC_BASE, DEVICE_NAME, client_id);
+      if (len_tc < 0 || (unsigned) len_tc >= sizeof(topic_base)) {
+        SerPrintln("ERROR, base topic cannot be constructed");
+        return;
+      }
+
+      len_sn = snprintf(config_doc, sizeof(config_doc), configs[i], topic_base, dev_conf, uid);
+      if (len_sn < 0 || (unsigned) len_sn >= (int) sizeof(config_doc)) {
+        SerPrintln("Client id cannot be constructed");
+      };
+
+      SerPrintln(mqtt.publish(topic_config, config_doc, false));
+      delay(1000);
+    }
+    mqtt.setBufferSize(256);
+  }
 
   SerPrintln("initialization done");  
 }
 
 void loop() {
   unsigned long curr_ms = millis();
-  static unsigned long prev_ms = -1, mqtt_connect_ms;
+  static unsigned long prev_ms = OLED_REFRESH_INTERVAL_MS, prev_ms_hass = HASS_REFRESH_INTERVAL_MS, mqtt_connect_ms;
   static unsigned int msg_counter = 0;
+
+  uptimer.run();
   
   if (curr_ms - prev_ms >= OLED_REFRESH_INTERVAL_MS) {
     prev_ms = curr_ms;
@@ -112,6 +166,27 @@ void loop() {
           retry_nr = (retry_nr + 1) % 17;
       }
     }
+  }
+
+  if (!mqtt.connected()) {
+    return;  // no point to execute the rest of the code if mqtt is disconnected
+  }
+
+  if (curr_ms - prev_ms_hass >= HASS_REFRESH_INTERVAL_MS) {
+    char state[100];
+    char top[100];
+    prev_ms_hass = curr_ms;
+    int len_sn;
+
+    snprintf(top, sizeof(top), HASS_TOPIC_BASE, DEVICE_NAME, client_id);
+    if (strlcat(top, HASS_TOPIC_SUFFIX_STATE, sizeof(top)) >= sizeof(top)) {
+      SerPrintln("ERROR, state topic truncated");
+    }
+
+    len_sn = snprintf(state, sizeof(state), HASS_PAYLOAD_STATE, msg_counter, uptimer.getUptimeSeconds());
+    if (len_sn < 0 || (unsigned) len_sn >= sizeof(state)) SerPrintln("ERROR, payload state truncated");
+
+    mqtt.publish(top, state, false);
   }
 
   if (!Strring.is_empty()) {
@@ -155,20 +230,20 @@ void loop() {
  * @returns value from PubSubClient.state()
  */
 int connectMqtt() {
-  char payload[50];
-  char utc[21];
+  int len_tp;
+  char will_topic[75];
 
-  if (mqtt.connect(client_id, MQTT_USER, MQTT_PASS, topic_on_off_line, 1, true, MQTT_PAYLOAD_OFFLINE)) {
-    if (!NtpTime.getUtcIsoString(utc, sizeof(utc))) {
-      SerPrintln("ERROR, cannot obtain UTC time");
-      return -6;
-    }
-    int len_sn = snprintf(payload, sizeof(payload), MQTT_PAYLOAD_ONLINE, utc);
-    if (len_sn < 0 || (unsigned)len_sn >= sizeof(payload)) {
-      SerPrintln("ERROR, online payload truncated");
-      return -5;
-    }
-    mqtt.publish(topic_on_off_line, payload, true);
+  len_tp = snprintf(will_topic, sizeof(will_topic), HASS_TOPIC_BASE, DEVICE_NAME, client_id);
+  if (len_tp < 0 || (unsigned) len_tp >= sizeof(will_topic)) {
+    SerPrintln("ERROR, will topic truncated");
+    return -5;
+  }
+  if (strlcat(will_topic, HASS_TOPIC_SUFFIX_AVAILIBILITY, sizeof(will_topic)) >= sizeof(will_topic)) {
+    SerPrintln("ERROR, will topic cannot be constructed");
+  }
+
+  if (mqtt.connect(client_id, MQTT_USER, MQTT_PASS, will_topic, 1, true, "offline")) {
+    mqtt.publish(will_topic, "online", true);
   }
 
   return mqtt.state();
