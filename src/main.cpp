@@ -133,7 +133,7 @@ void setup()
         SerPrintln("Client id cannot be constructed");
       };
 
-      SerPrintln(mqtt.publish(topic_config, config_doc, true));
+      mqtt.publish(topic_config, config_doc, true);
       delay(1000);
     }
     mqtt.setBufferSize(256);
