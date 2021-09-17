@@ -4,9 +4,8 @@
 #include <EspChipId.h>
 #include <PubSubClient.h>
 #include <SerPrint.h>
-#include <Uptimer.h>
 #include <WiFi.h>
-#include <WiFiClient.h>
+#include <WiFiClientSecure.h>
 #include "config.h"
 #include "gateway.h"
 #include "loracomm.h"
@@ -14,13 +13,13 @@
 
 EspNtpTime NtpTime;
 StringRingBuffer Strring(1000);
-WiFiClient espClient;
+WiFiClientSecure espClient;
 PubSubClient mqtt(espClient);
-Uptimer uptimer;
 
 int connectMqtt();
 
 char client_id[20];
+char uptime[21];
 
 void setup()
 {
@@ -66,6 +65,7 @@ void setup()
     ESP.restart();
   }
   SerPrintln("success");
+  NtpTime.getUtcIsoString(uptime);
 
   len_sn = snprintf(client_id, sizeof(client_id), DEVICE_ID, EspChipId.get());
   if (len_sn < 0 || (unsigned) len_sn >= (int) sizeof(client_id)) {
@@ -74,10 +74,19 @@ void setup()
   };
 
   SerPrint("Starting MQTT connection: ");
-  mqtt.setServer(MQTT_BROKER_IP, 1883);
+  espClient.setCACert((const char *) ca_crt_start);
+  espClient.setCertificate((const char *) certificate_crt_start);
+  espClient.setPrivateKey((const char *) private_key_start);
+  mqtt.setServer(MQTT_BROKER_IP, 8883);
   if (connectMqtt() != 0) {
+    char err_buf[256];
+
     SerPrint("ERROR, MQTT failed, rc=");
     SerPrintln(mqtt.state());
+    espClient.lastError(err_buf, sizeof(err_buf));
+    SerPrint("SSL error: ");
+    SerPrintln(err_buf);
+
     delay(DELAYED_RESTART);
     ESP.restart();
   }
@@ -147,8 +156,6 @@ void loop() {
   static unsigned long prev_ms = OLED_REFRESH_INTERVAL_MS, prev_ms_hass = HASS_REFRESH_INTERVAL_MS, mqtt_connect_ms;
   static unsigned int msg_counter = 0;
 
-  uptimer.run();
-  
   if (curr_ms - prev_ms >= OLED_REFRESH_INTERVAL_MS) {
     prev_ms = curr_ms;
     bool mqtt_state = mqtt.state() == 0 ? true : false;
@@ -183,7 +190,7 @@ void loop() {
       SerPrintln("ERROR, state topic truncated");
     }
 
-    len_sn = snprintf(state, sizeof(state), HASS_PAYLOAD_STATE, msg_counter, uptimer.getUptimeSeconds());
+    len_sn = snprintf(state, sizeof(state), HASS_PAYLOAD_STATE, msg_counter, uptime);
     if (len_sn < 0 || (unsigned) len_sn >= sizeof(state)) SerPrintln("ERROR, payload state truncated");
 
     mqtt.publish(top, state, false);
@@ -242,7 +249,7 @@ int connectMqtt() {
     SerPrintln("ERROR, will topic cannot be constructed");
   }
 
-  if (mqtt.connect(client_id, MQTT_USER, MQTT_PASS, will_topic, 1, true, "offline")) {
+  if (mqtt.connect(client_id, will_topic, 1, true, "offline")) {
     mqtt.publish(will_topic, "online", true);
   }
 

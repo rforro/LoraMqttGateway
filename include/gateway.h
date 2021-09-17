@@ -16,10 +16,10 @@
 #define HASS_PAYLOAD_CONF_DEVICE "{\"cns\":[[\"mac\",\"%s\"]],\"ids\":\"%08X\",\"mf\":\"espressif\",\"mdl\":\"ESP32\",\"name\":\"Lora2mqtt\"}"
 #define HASS_PAYLOAD_CONF_CNTR "{\"~\":\"%s\",\"avty_t\":\"~/available\",\"dev\":%s,\"ic\":\"hass:counter\",\"name\":\"Lora2mqtt Message Counter\",\
 \"stat_t\":\"~/state\",\"uniq_id\":\"%s\",\"val_tpl\":\"{{value_json.msg_cntr}}\"}"
-#define HASS_PAYLOAD_CONF_UPTM "{\"~\":\"%s\",\"avty_t\":\"~/available\",\"dev\":%s,\"ic\":\"hass:timeline-clock-outline\",\"name\":\"Lora2mqtt Uptime\",\
+#define HASS_PAYLOAD_CONF_UPTM "{\"~\":\"%s\",\"avty_t\":\"~/available\",\"dev\":%s,\"dev_cla\":\"timestamp\",\"name\":\"Lora2mqtt Uptime\",\
 \"stat_t\":\"~/state\",\"unit_of_meas\":\"sec\",\"uniq_id\":\"%s\",\"val_tpl\":\"{{value_json.uptime}}\"}"
 
-#define HASS_PAYLOAD_STATE "{\"msg_cntr\":\"%u\",\"uptime\":\"%u\"}"
+#define HASS_PAYLOAD_STATE "{\"msg_cntr\":\"%u\",\"uptime\":\"%s\"}"
 
 #define DELAYED_RESTART 30000
 #define OLED_REFRESH_INTERVAL_MS (1000 * 30)
