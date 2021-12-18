@@ -45,7 +45,7 @@ void refreshInfoScreen(boolean mqtt_state, IPAddress ip, uint32_t free_heap, uns
     display.println(mqtt_state ? F("online") : F("offline"));
 
     // show ip
-    display.print(F("IP addr: "));
+    display.print(F("IP: "));
     display.println(ip);
 
     // show free heap

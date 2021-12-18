@@ -162,6 +162,16 @@ void loop() {
     refreshInfoScreen(mqtt_state, WiFi.localIP(), ESP.getFreeHeap(), msg_counter);
   }
 
+  if (WiFi.status() != WL_CONNECTED) {
+    SerPrint("Wifi down, reconnecting... = ");
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    if (WiFi.waitForConnectResult() != WL_CONNECTED) {
+      SerPrintln("unable to establish wifi connection, rebooting...");
+      delay(DELAYED_RESTART);
+      ESP.restart();
+    };
+  }
+
   if (!mqtt.loop() && (WiFi.status() == WL_CONNECTED)) {
     SerPrintln("Mqtt connection is down, reconnecting...");
     static uint8_t retry_nr = 0;
@@ -170,7 +180,7 @@ void loop() {
       if (connectMqtt() == 0) {
           retry_nr = 0;
       } else {
-          retry_nr = (retry_nr + 1) % 17;
+          retry_nr = (retry_nr + 1) % 13;
       }
     }
   }
