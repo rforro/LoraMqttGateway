@@ -33,10 +33,11 @@ IRAM_ATTR void callbackRecv(int packetSize)
         SerPrint("Received valid msg with rssi: ");
         SerPrintln(LoRa.packetRssi());
 
-        int ret = decrypt_packet(plain, sizeof(buffer), &buffer[strlen(MAGIC_WORD)], packetSize-strlen(MAGIC_WORD));
+        int ret = decrypt_packet(plain, sizeof(plain) / sizeof(plain[0]), &buffer[strlen(MAGIC_WORD)], packetSize - strlen(MAGIC_WORD));
         SerPrint("Decryption returned: ");
         SerPrintln(ret);
-        if (ret == 0) {
+        if (ret == 0)
+        {
             Strring.pushstr(plain);
         }
     }

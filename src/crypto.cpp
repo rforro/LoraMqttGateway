@@ -46,9 +46,10 @@ int decrypt_packet(char *plain, size_t plain_len, char *encrypted, size_t encryp
         return PADDING_ERROR;
     }
 
-    if (strlcpy(plain, (char*)msg_padded, msg_unpadded_len + 1) >= plain_len) { // msg_padded is not NULL terminated
+    if (msg_unpadded_len >= plain_len) {
         return PLAIN_LENGTH_ERROR;
     }
+    strncpy(plain, (char*)msg_padded, msg_unpadded_len);
 
     return 0;
 }
